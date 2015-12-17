@@ -2,33 +2,11 @@
 
 cwd=$(pwd)
 
-#source repo
-REPO_URL="https://github.com/ATtinyTeenageRiot/Babygnusbuino2.git"
-REPO_LOCAL_DIR="baby-release"
-RELEASES_DIR="boards"
-RELEASE_PREFIX="babygnusbuino-"
-RELEASE_INDEX_JSON_FILENAME="package_babygnusbuino_index.json"
+STAGING_DIR="staging"
 
-#platform
-BOARD_PACKAGE_NAME=Babygnusbuino2
-BOARD_PACKAGE_MAINTAINER=ATtinyTeenageRiot
-BOARD_PACKAGE_WEB_URL=https://github.com/ATtinyTeenageRiot/Babygnusbuino2
-BOARD_PACKAGE_HELP_URL=https://github.com/ATtinyTeenageRiot/Babygnusbuino2
-BOARD_PACKAGE_MAINTAINER_EMAIL=iyok@deadmediafm.org
+#REPO_LOCAL_DIR="staging/${REPO_LOCAL_DIR}"
 
-#board specific
-BOARD_NAME=Babygnusbuino
-BOARD_ARCH=avr
-BOARD_VERSION=1.0.0
-BOARD_CATEGORY=Babygnusbuino
-BOARD_HELP_URL=https://github.com/ATtinyTeenageRiot/Babygnusbuino2
-
-#downloadable archive
-BOARD_ARCHIVE_URL=https://github.com/ATtinyTeenageRiot/Babygnusbuino2	#http://
-# BOARD_ARCHIVE_FILENAME= #tar.gz
-# BOARD_ARCHIVE_CHKSUM=	#sha256
-# BOARD_ARCHIVE_SIZE=	#bytes
-
+source ./config.conf
 
 #define the template.
 function generate_platform_template() #version, url, checksum, size
@@ -98,9 +76,9 @@ echo "${ARDUINO_PACKAGES_TEMPLATE_JSON}"
 
 function git_update_repo()
 {
-	if [ -d "${REPO_LOCAL_DIR}" ] #if directory exists
+	if [ -d "${STAGING_DIR}/${REPO_LOCAL_DIR}" ] #if directory exists
 	then
-		cd "${cwd}/${REPO_LOCAL_DIR}"
+		cd "${cwd}/${STAGING_DIR}/${REPO_LOCAL_DIR}"
 
 		git fetch --all
 		git pull --all
@@ -184,19 +162,19 @@ function make_packages()
 	for (( i=0; i<${tLen}; i++ ));
 	do
   		IFS=', ' read -a array <<< "${releases[$i]}"
-		local _RELEASE_VERSION=${RELEASE_PREFIX}${array[0]}
+		local _RELEASE_VERSION=${array[0]}
 		local _COMMIT_HASH=${array[1]}
 
-		if check_release_archive_exists ${_RELEASE_VERSION}
+		if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
 		then
 			echo "${_RELEASE_VERSION} exists, skip"
 		else
-			update_release_repo "${REPO_URL}" "${REPO_LOCAL_DIR}" "${_COMMIT_HASH}"
-			archive_release_repo "${REPO_LOCAL_DIR}" "${_RELEASE_VERSION}"
+			update_release_repo "${REPO_URL}" "${STAGING_DIR}/${REPO_LOCAL_DIR}" "${_COMMIT_HASH}"
+			archive_release_repo "${STAGING_DIR}/${REPO_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}"
 		fi	
 
-		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
-		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${BOARD_ARCHIVE_URL}/${_RELEASE_VERSION}.tar.gz ${sha_result}`
+		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
+		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${BOARD_ARCHIVE_URL}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz ${sha_result}`
 		
 		if [ $((i+1)) -ne $tLen ]
 		then
