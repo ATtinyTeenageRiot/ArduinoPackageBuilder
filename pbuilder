@@ -147,17 +147,7 @@ function check_release_archive_exists()
 
 function make_packages()
 {
-	#git_update_repo
-	
-	local input="releases.txt"
-	local platform_list=""
-	local releases=()
-
-	# while IFS= read -r var
-	# do
-	# 	IFS=', ' read -r line <<< "$var"
-	# 	releases+=(${line})
-	# done < "$input"
+	git_update_repo
 
 	# get length of an array
 	local tLen=${#RELEASE_VERSION[@]}
