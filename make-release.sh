@@ -6,8 +6,6 @@ STAGING_DIR="staging"
 
 #REPO_LOCAL_DIR="staging/${REPO_LOCAL_DIR}"
 
-source ./config.conf
-
 #define the template.
 function generate_platform_template() #version, url, checksum, size
 {
@@ -149,19 +147,19 @@ function make_packages()
 	local platform_list=""
 	local releases=()
 
-	while IFS= read -r var
-	do
-		IFS=', ' read -r line <<< "$var"
-		releases+=(${line})
-	done < "$input"
+	# while IFS= read -r var
+	# do
+	# 	IFS=', ' read -r line <<< "$var"
+	# 	releases+=(${line})
+	# done < "$input"
 
 	# get length of an array
-	tLen=${#releases[@]}
+	local tLen=${#RELEASE_VERSION[@]}
 	 
 	# use for loop read all
 	for (( i=0; i<${tLen}; i++ ));
 	do
-  		IFS=', ' read -a array <<< "${releases[$i]}"
+  		IFS=', ' read -a array <<< "${RELEASE_VERSION[$i]}"
 		local _RELEASE_VERSION=${array[0]}
 		local _COMMIT_HASH=${array[1]}
 
@@ -187,6 +185,88 @@ function make_packages()
 }
 
 
+function add_new_release()
+{
+	local tLen=${#RELEASE_VERSION[@]}
+
+	local _release_version=${1}
+	local _commit_hash=${2}		
+	#echo -e "RELEASE_VERSION[$((tLen))]=${_release_version},${_commit_hash}\n" >> _conf_file
+	echo -e "RELEASE_VERSION[$((tLen))]=${_release_version},${_commit_hash}\n" >> ${CONFIG_FILE}
+
+}
+
+
+function list_release()
+{
+	local tLen=${#RELEASE_VERSION[@]}
+
+	for (( i=0; i<${tLen}; i++ ));
+	do
+	IFS=', ' read -a array <<< "${RELEASE_VERSION[$i]}"
+	local _RELEASE_VERSION=${array[0]}
+	local _COMMIT_HASH=${array[1]}
+
+	echo "release version: ${_RELEASE_VERSION} commit: ${_COMMIT_HASH}"
+
+	done
+
+
+}
+
+
+function usage()
+{
+echo "usage"
+}
+
+
+
+function check_config_exists()
+{
+	local _FILE_NAME=${1}
+	
+	if [ -e "${_FILE_NAME}" ]
+	then
+		CONFIG_FILE="${_FILE_NAME}"
+		source ${_FILE_NAME}
+	else
+		CONFIG_FILE="./config.conf"
+		source "${CONFIG_FILE}"
+	fi
+}
+
+
+while [ "$1" != "" ]; do
+    case $1 in
+        -l | --list )   
+		check_config_exists ${2} 
+		list_release
+        ;;
+        -c | --config )
+		check_config_exists ${2}
+		make_packages
+		exit
+		;;
+        -a | --add )
+		check_config_exists ${4}
+		add_new_release ${2} ${3}
+		exit		
+        ;;
+        -h | --help )
+		usage
+        exit
+        ;;
+        -b | --build | build )
+		usage
+        exit
+        ;;        
+        * )
+		usage
+        exit 1
+    esac
+    shift
+done
+
+source "./config.conf"
 make_packages
-
-
