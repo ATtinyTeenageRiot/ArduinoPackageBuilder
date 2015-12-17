@@ -4,6 +4,8 @@ cwd=$(pwd)
 
 STAGING_DIR="staging"
 
+DEFAULT_CONFIG_FILE="config.conf"
+
 #REPO_LOCAL_DIR="staging/${REPO_LOCAL_DIR}"
 
 #define the template.
@@ -235,7 +237,7 @@ function check_config_exists()
 		CONFIG_FILE="${_FILE_NAME}"
 		source ${_FILE_NAME}
 	else
-		CONFIG_FILE="./config.conf"
+		CONFIG_FILE="./${DEFAULT_CONFIG_FILE}"
 		source "${CONFIG_FILE}"
 	fi
 }
@@ -252,7 +254,7 @@ function push_release_pages()
 	cd ${cwd}
 }
 
-source "./config.conf"
+source "./${DEFAULT_CONFIG_FILE}"
 
 while [ "$1" != "" ]; do
     case $1 in
@@ -299,5 +301,5 @@ while [ "$1" != "" ]; do
     shift
 done
 
-source "./config.conf"
+source "./${DEFAULT_CONFIG_FILE}"
 make_packages
