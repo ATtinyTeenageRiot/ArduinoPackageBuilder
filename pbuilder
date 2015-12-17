@@ -298,6 +298,8 @@ while [ "$1" != "" ]; do
 			rm -fr ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}*
 			echo "delete ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}"		
 			rm -fr ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}
+			cd ${RELEASES_DIR}/${RELEASES_REPO_DIR}
+			git reset --hard
 	        exit
         ;;               
         * )
