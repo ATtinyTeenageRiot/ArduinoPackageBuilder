@@ -6,6 +6,7 @@ STAGING_DIR="staging"
 DEFAULT_CONFIG_FILE="config.conf"
 RELEASES_DIR="releases"
 RELEASES_BOARD_DIR="boards"
+RELEASE_VERSION=()
 
 #REPO_LOCAL_DIR="staging/${REPO_SOURCE_LOCAL_DIR}"
 
@@ -184,13 +185,13 @@ function make_packages()
 
 function add_new_release()
 {
-	local tLen=${#RELEASE_VERSION[@]}
+	echo -e "ADD_RELEASE_VERSION ${1} ${2}\n" >> ${CONFIG_FILE}
+}
 
-	local _release_version=${1}
-	local _commit_hash=${2}		
-	#echo -e "RELEASE_VERSION[$((tLen))]=${_release_version},${_commit_hash}\n" >> _conf_file
-	echo -e "RELEASE_VERSION[$((tLen))]=${_release_version},${_commit_hash}\n" >> ${CONFIG_FILE}
 
+function ADD_RELEASE_VERSION()
+{
+RELEASE_VERSION+=("${1}","${2}")
 }
 
 
@@ -228,8 +229,15 @@ function check_config_exists()
 		CONFIG_FILE="${_FILE_NAME}"
 		source ${_FILE_NAME}
 	else
-		CONFIG_FILE="./${DEFAULT_CONFIG_FILE}"
-		source "${CONFIG_FILE}"
+		if [ -e "${DEFAULT_CONFIG_FILE}" ]
+		then
+			echo "using default ./${DEFAULT_CONFIG_FILE}"
+			CONFIG_FILE="./${DEFAULT_CONFIG_FILE}"
+			source "${CONFIG_FILE}"
+		else
+			echo "config not found, abort"
+			exit 1
+		fi
 	fi
 }
 
@@ -255,13 +263,13 @@ function git_push_release_pages()
 	cd ${cwd}
 }
 
-source "./${DEFAULT_CONFIG_FILE}"
 
 while [ "$1" != "" ]; do
     case $1 in
         -l | --list )   
 			check_config_exists ${2} 
 			list_release
+			exit
         ;;
         -c | --config )
 			check_config_exists ${2}
@@ -307,13 +315,14 @@ while [ "$1" != "" ]; do
 			echo "delete ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}"		
 			rm -fr ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}
 	        exit
-        ;;               
-        * )
-			usage
-	        exit 1
+   #      ;;               
+   #      * )
+			# usage
+	  #       exit 1
     esac
     shift
 done
 
-source "./${DEFAULT_CONFIG_FILE}"
+
+check_config_exists "./${DEFAULT_CONFIG_FILE}"
 make_packages
