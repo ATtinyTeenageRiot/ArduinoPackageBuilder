@@ -1,12 +1,15 @@
 #!/bin/bash
 
 cwd=$(pwd)
+RELEASE_VERSION=()
 
 STAGING_DIR="staging"
 DEFAULT_CONFIG_FILE="config.conf"
 RELEASES_DIR="releases"
 RELEASES_BOARD_DIR="boards"
-RELEASE_VERSION=()
+TEMPLATE_DIR="template"
+TEMPLATE_PLATFORM_FILE="platform.json"
+TEMPLATE_PACKAGE_FILE="package.json"
 
 #REPO_LOCAL_DIR="staging/${REPO_SOURCE_LOCAL_DIR}"
 
@@ -14,66 +17,32 @@ RELEASE_VERSION=()
 function generate_platform_template() #version, url, checksum, size
 {
 
+local _version=${1}
+local _url=${2}
+local _sha=${3}
+local _size=${4}
+local _template=${4}
+
+if [ "default" = "${_template}" ] || [ "" = "${_template}" ]
+then
+_template=${TEMPLATE_PLATFORM_FILE}
+fi
+
 local archiveFileName="${2}"; 
-
-local ARDUINO_PLATFORM_TEMPLATE_JSON=`cat<<EOF
-			{
-				"name" : "${BOARD_NAME}",
-				"architecture" : "${BOARD_ARCH}",
-				"version" : "${1}",
-				"category" : "${BOARD_CATEGORY}",
-				"url" : "${2}",
-				"archiveFileName" : "${archiveFileName##*/}",
-				"checksum" : "SHA-256:${3}",
-				"size" : "${4}",
-				"help" : {
-					"online" : "${BOARD_HELP_URL}"
-				},
-				"boards" : [
-					{
-						"name" : "${BOARD_NAME}"
-					}
-				],
-				"toolsDependencies" : [
-					{
-						"packager" : "arduino",
-						"name" : "avr-gcc",
-						"version" : "4.8.1-arduino5"
-					},
-					{
-						"packager" : "arduino",
-						"name" : "avrdude",
-						"version" : "6.0.1-arduino5"
-					}
-				]
-			}
-EOF`
-echo "${ARDUINO_PLATFORM_TEMPLATE_JSON}"
+eval "cat <<EOF
+$(<./${TEMPLATE_DIR}/${_template})
+EOF
+" 2> /dev/null
 }
-
 
 function generate_package_template() #platforms
 {
-local ARDUINO_PACKAGES_TEMPLATE_JSON=`cat<<EOF
-{
-	"packages" : [
-		{
-			"name" : "${BOARD_PACKAGE_NAME}",
-			"maintainer" : "${BOARD_PACKAGE_MAINTAINER}",
-			"websiteURL" : "${BOARD_PACKAGE_WEB_URL}",
-			"email" : "${BOARD_PACKAGE_MAINTAINER_EMAIL}",
-			"help" : {
-				"online" : "${BOARD_PACKAGE_HELP_URL}"
-			},
-			"platforms" : [
-				${1}
-			],
-			"tools" : []
-		}
-	]
-}
-EOF`	
-echo "${ARDUINO_PACKAGES_TEMPLATE_JSON}"
+local _platforms=${1}
+local _template=${TEMPLATE_PACKAGE_FILE}
+eval "cat <<EOF
+$(<./${TEMPLATE_DIR}/${_template})
+EOF
+" 2> /dev/null
 }
 
 function git_update_repo()
@@ -160,6 +129,8 @@ function make_packages()
   		IFS=', ' read -a array <<< "${RELEASE_VERSION[$i]}"
 		local _RELEASE_VERSION=${array[0]}
 		local _COMMIT_HASH=${array[1]}
+		local _PLATFORM_TEMPLATE=${array[2]}
+		
 
 		if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
 		then
@@ -170,7 +141,7 @@ function make_packages()
 		fi	
 
 		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
-		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz ${sha_result}`
+		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz ${sha_result} ${_PLATFORM_TEMPLATE}`
 		
 		if [ $((i+1)) -ne $tLen ]
 		then
@@ -185,13 +156,13 @@ function make_packages()
 
 function add_new_release()
 {
-	echo -e "ADD_RELEASE_VERSION ${1} ${2}\n" >> ${CONFIG_FILE}
+	echo -e "ADD_RELEASE_VERSION ${1} ${2} ${3}\n" >> ${CONFIG_FILE}
 }
 
 
 function ADD_RELEASE_VERSION()
 {
-RELEASE_VERSION+=("${1}","${2}")
+RELEASE_VERSION+=("${1}","${2}","${3}")
 }
 
 

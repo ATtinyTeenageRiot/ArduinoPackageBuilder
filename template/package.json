@@ -1,0 +1,17 @@
+{
+	"packages" : [
+		{
+			"name" : "${BOARD_PACKAGE_NAME}",
+			"maintainer" : "${BOARD_PACKAGE_MAINTAINER}",
+			"websiteURL" : "${BOARD_PACKAGE_WEB_URL}",
+			"email" : "${BOARD_PACKAGE_MAINTAINER_EMAIL}",
+			"help" : {
+				"online" : "${BOARD_PACKAGE_HELP_URL}"
+			},
+			"platforms" : [
+				${_platforms}
+			],
+			"tools" : []
+		}
+	]
+}
