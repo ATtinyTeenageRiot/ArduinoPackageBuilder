@@ -6,7 +6,7 @@ STAGING_DIR="staging"
 
 DEFAULT_CONFIG_FILE="config.conf"
 
-#REPO_LOCAL_DIR="staging/${REPO_LOCAL_DIR}"
+#REPO_LOCAL_DIR="staging/${REPO_SOURCE_LOCAL_DIR}"
 
 #define the template.
 function generate_platform_template() #version, url, checksum, size
@@ -76,9 +76,9 @@ echo "${ARDUINO_PACKAGES_TEMPLATE_JSON}"
 
 function git_update_repo()
 {
-	if [ -d "${STAGING_DIR}/${REPO_LOCAL_DIR}" ] #if directory exists
+	if [ -d "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" ] #if directory exists
 	then
-		cd "${cwd}/${STAGING_DIR}/${REPO_LOCAL_DIR}"
+		cd "${cwd}/${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}"
 
 		git fetch --all
 		git pull --all
@@ -120,14 +120,14 @@ function update_release_repo() #repo url, dir, specific commit
 
 function archive_release_repo() #repo dir, filename
 {
-	mkdir -p ${cwd}/${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}
+	mkdir -p ${cwd}/${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASES_BOARD_DIR}
 
 	local _REPO_DIR=${1}
 	local _ARCHIVE_FILE=${2}
 	
 	cd ${cwd}/${_REPO_DIR}
-	tar --exclude=".git" --exclude="make_package.sh" --exclude=".DS_Store" --exclude=".gitignore" --exclude=".gitmodules" --exclude="package_babygnusbuino2_index.json" -czf  ${cwd}/${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  *
-	shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  | cut -d ' ' -f 1 > ${cwd}/${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
+	tar --exclude=".git" --exclude="make_package.sh" --exclude=".DS_Store" --exclude=".gitignore" --exclude=".gitmodules" --exclude="package_babygnusbuino2_index.json" -czf  ${cwd}/${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  *
+	shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  | cut -d ' ' -f 1 > ${cwd}/${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
 	cd "${cwd}"
 }
 
@@ -136,7 +136,7 @@ function check_release_archive_exists()
 {
 	local _FILE_NAME=${1}
 	
-	if [ -e "${cwd}/${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${_FILE_NAME}.tar.gz" ]
+	if [ -e "${cwd}/${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASES_BOARD_DIR}/${_FILE_NAME}.tar.gz" ]
 	then
 		return 0 #true
 	else
@@ -163,11 +163,11 @@ function make_packages()
 		then
 			echo "${_RELEASE_VERSION} exists, skip"
 		else
-			update_release_repo "${REPO_URL}" "${STAGING_DIR}/${REPO_LOCAL_DIR}" "${_COMMIT_HASH}"
-			archive_release_repo "${STAGING_DIR}/${REPO_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}"
+			update_release_repo "${REPO_SOURCE_URL}" "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${_COMMIT_HASH}"
+			archive_release_repo "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}"
 		fi	
 
-		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
+		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
 		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${BOARD_ARCHIVE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz ${sha_result}`
 		
 		if [ $((i+1)) -ne $tLen ]
@@ -177,7 +177,7 @@ function make_packages()
 	done
 
 	local json_package_output=`generate_package_template "${platform_list}"`
-	echo "${json_package_output}" > "${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASE_INDEX_JSON_FILENAME}"
+	echo "${json_package_output}" > "${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}"
 }
 
 
@@ -236,8 +236,8 @@ function git_init_release_pages()
 {
 	cd ${RELEASES_DIR}
 	
-	git clone --depth 1 ${RELEASES_REPO_URL} ${RELEASES_MAIN_DIR}
-	cd ${RELEASES_MAIN_DIR}
+	git clone --depth 1 ${RELEASES_REPO_URL} ${RELEASES_REPO_DIR}
+	cd ${RELEASES_REPO_DIR}
 	git checkout --orphan gh-pages
 
 	cd ${cwd}
@@ -245,7 +245,7 @@ function git_init_release_pages()
 
 function git_push_release_pages()
 {
-	cd ${RELEASES_DIR}/${RELEASES_MAIN_DIR}
+	cd ${RELEASES_DIR}/${RELEASES_REPO_DIR}
 
 	git add .
 	git commit -m "update release"
@@ -294,10 +294,10 @@ while [ "$1" != "" ]; do
         clean )
 			check_config_exists ${2} 
 			echo "cleaning release folder and package json"
-			echo "delete ${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}*"		
-			rm -fr ${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}*
-			echo "delete ${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASE_INDEX_JSON_FILENAME}"		
-			rm -fr ${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASE_INDEX_JSON_FILENAME}
+			echo "delete ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}*"		
+			rm -fr ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}*
+			echo "delete ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}"		
+			rm -fr ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}
 	        exit
         ;;               
         * )
