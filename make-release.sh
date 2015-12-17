@@ -101,13 +101,15 @@ function update_release_repo() #repo url, dir, specific commit
 	if [ -d "${_REPO_LOCAL_DIR}" ] #if directory exists
 	then
 		cd "${cwd}/${_REPO_LOCAL_DIR}"
-		git checkout ${_COMMIT_HASH}
+		git reset --hard ${_COMMIT_HASH}
 		git submodule update --init --recursive
+		git submodule foreach --recursive git clean -d -f -f
 	else
 		git clone "${_REPO_REMOTE_URL}" "${_REPO_LOCAL_DIR}"
 		cd "${_REPO_LOCAL_DIR}"
 		git checkout ${_COMMIT_HASH}
 		git submodule update --init --recursive
+		git submodule foreach --recursive git clean -d -f -f
 	fi
 	
 	cd "${cwd}"
@@ -116,12 +118,14 @@ function update_release_repo() #repo url, dir, specific commit
 
 function archive_release_repo() #repo dir, filename
 {
+	mkdir -p ${cwd}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}
+
 	local _REPO_DIR=${1}
 	local _ARCHIVE_FILE=${2}
 	
 	cd ${cwd}/${_REPO_DIR}
-	tar --exclude=".git" --exclude="make_package.sh" --exclude=".DS_Store" --exclude=".gitignore" --exclude=".gitmodules" --exclude="package_babygnusbuino2_index.json" -czf  ${cwd}/${RELEASES_DIR}/${_ARCHIVE_FILE}.tar.gz  *
-	shasum -a 256 ${cwd}/${RELEASES_DIR}/${_ARCHIVE_FILE}.tar.gz  | cut -d ' ' -f 1 > ${cwd}/${RELEASES_DIR}/${_ARCHIVE_FILE}.sha.txt
+	tar --exclude=".git" --exclude="make_package.sh" --exclude=".DS_Store" --exclude=".gitignore" --exclude=".gitmodules" --exclude="package_babygnusbuino2_index.json" -czf  ${cwd}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  *
+	shasum -a 256 ${cwd}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  | cut -d ' ' -f 1 > ${cwd}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
 	cd "${cwd}"
 }
 
@@ -130,7 +134,7 @@ function check_release_archive_exists()
 {
 	local _FILE_NAME=${1}
 	
-	if [ -e "${cwd}/${RELEASES_DIR}/${_FILE_NAME}.tar.gz" ]
+	if [ -e "${cwd}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${_FILE_NAME}.tar.gz" ]
 	then
 		return 0 #true
 	else
@@ -171,7 +175,7 @@ function make_packages()
 			archive_release_repo "${STAGING_DIR}/${REPO_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}"
 		fi	
 
-		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
+		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
 		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${BOARD_ARCHIVE_URL}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz ${sha_result}`
 		
 		if [ $((i+1)) -ne $tLen ]
@@ -181,7 +185,7 @@ function make_packages()
 	done
 
 	local json_package_output=`generate_package_template "${platform_list}"`
-	echo "${json_package_output}" > "${RELEASE_INDEX_JSON_FILENAME}"
+	echo "${json_package_output}" > "${RELEASES_MAIN_DIR}/${RELEASE_INDEX_JSON_FILENAME}"
 }
 
 
@@ -237,33 +241,60 @@ function check_config_exists()
 }
 
 
+function push_release_pages()
+{
+	cd ${RELEASES_MAIN_DIR}
+
+	git add .
+	git commit -m "update release"
+	git push origin gh-pages
+
+	cd ${cwd}
+}
+
+source "./config.conf"
+
 while [ "$1" != "" ]; do
     case $1 in
         -l | --list )   
-		check_config_exists ${2} 
-		list_release
+			check_config_exists ${2} 
+			list_release
         ;;
         -c | --config )
-		check_config_exists ${2}
-		make_packages
-		exit
+			check_config_exists ${2}
+			make_packages
+			exit
 		;;
         -a | --add )
-		check_config_exists ${4}
-		add_new_release ${2} ${3}
-		exit		
+			check_config_exists ${4}
+			add_new_release ${2} ${3}
+			exit		
         ;;
         -h | --help )
-		usage
-        exit
+			usage
+	        exit
         ;;
         -b | --build | build )
-		usage
-        exit
-        ;;        
+			usage
+	        exit
+        ;;   
+        publish )
+			check_config_exists ${2}
+			push_release_pages
+	        exit
+        ;;           
+        clean )
+			check_config_exists ${2} 
+			echo "cleaning release folder and package json"
+			echo "delete ${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}*"		
+			rm -fr ${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}*
+			echo "delete ${RELEASES_MAIN_DIR}/${RELEASE_INDEX_JSON_FILENAME}"		
+			rm -fr ${RELEASES_MAIN_DIR}/${RELEASE_INDEX_JSON_FILENAME}
+	        exit
+        ;;               
         * )
-		usage
-        exit 1
+			usage
+	        exit 1
     esac
     shift
 done
