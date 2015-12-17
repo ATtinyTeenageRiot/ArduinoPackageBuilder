@@ -156,7 +156,7 @@ function make_packages()
 
 function add_new_release()
 {
-	echo -e "ADD_RELEASE_VERSION ${1} ${2} ${3}\n" >> ${CONFIG_FILE}
+	echo -e "ADD_RELEASE_VERSION\t\t${1}\t${2}\t${3}\n" >> ${CONFIG_FILE}
 }
 
 
@@ -247,9 +247,15 @@ while [ "$1" != "" ]; do
 			make_packages
 			exit
 		;;
-        -a | --add )
+        -a | --add | add)
 			check_config_exists ${4}
-			add_new_release ${2} ${3}
+			echo "Releases:"
+			# echo ""
+			list_release
+			echo "Add new release"
+			echo "Enter Version: "; read _version;
+			echo "Enter Commit#: "; read _commit;
+			add_new_release ${_version} ${_commit}
 			exit		
         ;;
         -h | --help )
