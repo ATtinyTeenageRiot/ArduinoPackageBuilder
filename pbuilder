@@ -168,11 +168,11 @@ function make_packages()
 		fi	
 
 		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASES_MAIN_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
-		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${BOARD_ARCHIVE_URL}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz ${sha_result}`
+		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${BOARD_ARCHIVE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz ${sha_result}`
 		
 		if [ $((i+1)) -ne $tLen ]
 		then
-			platform_list+=",\n"
+			platform_list+=","
 		fi
 	done
 
@@ -277,8 +277,9 @@ while [ "$1" != "" ]; do
 	        exit
         ;;
         -b | --build | build )
-			usage
-	        exit
+			check_config_exists ${2}
+			make_packages
+			exit
         ;;   
         publish )
 			check_config_exists ${2}
