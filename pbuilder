@@ -3,8 +3,9 @@
 cwd=$(pwd)
 
 STAGING_DIR="staging"
-
 DEFAULT_CONFIG_FILE="config.conf"
+RELEASES_DIR="releases"
+RELEASES_BOARD_DIR="boards"
 
 #REPO_LOCAL_DIR="staging/${REPO_SOURCE_LOCAL_DIR}"
 
@@ -291,6 +292,13 @@ while [ "$1" != "" ]; do
 			git_init_release_pages
 	        exit
         ;;  
+        reset )
+			check_config_exists ${2} 
+			echo "hard reset local release repo"
+			cd ${RELEASES_DIR}/${RELEASES_REPO_DIR}
+			git reset --hard
+	        exit
+        ;;            
         clean )
 			check_config_exists ${2} 
 			echo "cleaning release folder and package json"
@@ -298,8 +306,6 @@ while [ "$1" != "" ]; do
 			rm -fr ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}*
 			echo "delete ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}"		
 			rm -fr ${RELEASES_DIR}/${RELEASES_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}
-			cd ${RELEASES_DIR}/${RELEASES_REPO_DIR}
-			git reset --hard
 	        exit
         ;;               
         * )
