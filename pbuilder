@@ -11,6 +11,7 @@ TEMPLATE_DIR="template"
 TEMPLATE_PLATFORM_FILE="platform"
 TEMPLATE_PACKAGE_FILE="package"
 TEMPLATE_EXTENSION=".json"
+TOOLS_LIST=()
 
 #REPO_LOCAL_DIR="staging/${REPO_SOURCE_LOCAL_DIR}"
 
@@ -21,8 +22,10 @@ function generate_platform_template() #version, url, checksum, size
 local _version=${1}
 local _url=${2}
 local _sha=${3}
-local _size=${4}
-local _template=${4}
+# local _size=${4}
+
+local _tools_deps=${4}
+local _template=${5}
 
 local _template_ext="${TEMPLATE_EXTENSION}"
 
@@ -122,9 +125,143 @@ function check_release_archive_exists()
 }
 
 
+function generate_tools_deps_template()
+{
+	local array="${1}[@]"
+	local _tmp_string=""
+
+	local EXPR="echo \${#$1[@]}" 
+	local _cnt=`eval $EXPR`
+
+	for (( i=0; i<${_cnt}; i++ ));
+	do
+		local element="$1[$i]"
+		IFS=', ' read -a array <<< "${!element}"
+		_tmp_string+=`cat<<EOF
+					
+					{
+						"packager" : "${array[1]}",
+						"name" : "${array[2]}",
+						"version" : "${array[3]}"
+					}
+EOF`
+		if [ $((i+1)) -ne ${_cnt} ]
+		then
+			_tmp_string+=","
+		fi
+
+	done
+	echo "${_tmp_string}"
+}
+
+function generate_tools_template()
+{
+	local _tmp_string=""
+	local _sub_tmp_string=""
+	
+	local _cnt=${#TOOLS_LIST[@]}
+
+	for (( i=0; i<${_cnt}; i++ ));
+	do
+
+ 		IFS=', ' read -a array <<< "${TOOLS_LIST[i]}"
+ 		echo ${array[0]}
+
+		ARRAYNAME=${array[0]}
+		array="${ARRAYNAME}[@]"			
+		
+		local EXPR="echo \${#$ARRAYNAME[@]}" 
+		local _cnt_=`eval $EXPR`
+
+			for (( j=0; j<${_cnt_}; j++ ));
+			do
+
+
+				echo $j
+
+
+
+				if [ $((j+1)) -ne ${_cnt_} ]
+				then
+					echo ","
+				fi
+
+
+			done
+
+
+		if [ $((i+1)) -ne ${_cnt} ]
+		then
+			echo "-,"
+		fi
+
+
+	done
+	echo "${_tmp_string}"
+}
+
+function check_commit_exist()
+{
+	local _hash=${1}
+	local _my_version=${2}
+	local j=0
+
+	local tLen=${#RELEASE_VERSION[@]}
+	for ((j=0; j<${tLen}; j++ ));
+	do
+  		IFS=', ' read -a array <<< "${RELEASE_VERSION[$j]}"
+		local _RELEASE_VERSION=${array[0]}
+		local _COMMIT_HASH=${array[1]}
+		local _PLATFORM_TEMPLATE=${array[2]}
+		local _PLATFORM_DEPS=${array[3]}
+
+		if [ "${_hash}" == "${_COMMIT_HASH}" ] && [ "${_my_version}" != "${_RELEASE_VERSION}" ] 
+		then
+			if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
+			then
+				return 0
+			fi
+		fi
+
+	done
+
+	return 1
+}
+
+
+
+function get_duplicate_archive()
+{
+	local _hash=${1}
+	local _my_version=${2}
+	local j=0
+
+	local tLen=${#RELEASE_VERSION[@]}
+	for ((j=0; j<${tLen}; j++ ));
+	do
+  		IFS=', ' read -a array <<< "${RELEASE_VERSION[$j]}"
+		local _RELEASE_VERSION=${array[0]}
+		local _COMMIT_HASH=${array[1]}
+		local _PLATFORM_TEMPLATE=${array[2]}
+		local _PLATFORM_DEPS=${array[3]}
+
+		if [ "${_hash}" == "${_COMMIT_HASH}" ] && [ "${_my_version}" != "${_RELEASE_VERSION}" ] 
+		then
+			if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
+			then
+				echo "${_RELEASE_VERSION}"
+			fi
+		fi
+
+	done
+
+	echo ""
+}
+
+
 function make_packages()
 {
-	git_update_repo
+	#git_update_repo
 
 	# get length of an array
 	local tLen=${#RELEASE_VERSION[@]}
@@ -136,18 +273,45 @@ function make_packages()
 		local _RELEASE_VERSION=${array[0]}
 		local _COMMIT_HASH=${array[1]}
 		local _PLATFORM_TEMPLATE=${array[2]}
+		local _PLATFORM_DEPS=${array[3]}
 		
+		#check for duplicate commit that already have archive
+		if check_commit_exist ${_COMMIT_HASH} ${_RELEASE_VERSION}
+		 then 
+		 	echo "if found duplicate"
+		 	#check our own release if exist
+			if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
+			then
+				echo "skip archiving, write to package json only"
+				echo "${_RELEASE_VERSION} already exist, skip"
+			else #if we dont have package
+				echo "get that duplicate commit that have package archive"
+				_RELEASE_VERSION=`get_duplicate_archive ${_COMMIT_HASH} ${_RELEASE_VERSION}`
+			fi	
 
-		if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
-		then
-			echo "${_RELEASE_VERSION} exists, skip"
-		else
-			update_release_repo "${REPO_SOURCE_URL}" "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${_COMMIT_HASH}"
-			archive_release_repo "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}" "${BOARD_ARCH}"
-		fi	
+		 else #if no duplicate commit
+		 	echo "no dup commit"
+			 if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
+			 then
+			 	echo "${_RELEASE_VERSION} exists, skip"
+			 else
+			 	update_release_repo "${REPO_SOURCE_URL}" "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${_COMMIT_HASH}"
+			 	archive_release_repo "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}" "${BOARD_ARCH}"
+			 fi	
+		fi
+		
+		# if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
+		# then
+		# 	echo "${_RELEASE_VERSION} exists, skip"
+		# else
+		# 	update_release_repo "${REPO_SOURCE_URL}" "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${_COMMIT_HASH}"
+		# 	archive_release_repo "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}" "${BOARD_ARCH}"
+		# fi	
 
 		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
-		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz ${sha_result} ${_PLATFORM_TEMPLATE}`
+		local tools_deps=`generate_tools_deps_template ${_PLATFORM_DEPS}`
+
+		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz ${sha_result} "${tools_deps}" ${_PLATFORM_TEMPLATE}`
 		
 		if [ $((i+1)) -ne $tLen ]
 		then
@@ -160,6 +324,90 @@ function make_packages()
 }
 
 
+
+function LIST_ALL_TOOLS()
+{
+	ARRAYNAME="TOOLS_LIST"
+	array="${ARRAYNAME}[@]"
+	echo "List all tools"	
+	for element in "${!array}"; do
+		IFS=', ' read -a array <<< "${element}"
+		echo "	* ${array[0]} - ${array[1]} - ${array[2]} - ${array[3]}"
+		ARRAYNAME=${array[0]}
+		array="${ARRAYNAME}[@]"			
+				for item in "${!array}"; do
+					IFS=', ' read -a array <<< "${item}"
+					echo "	 + ${array[0]} - ${array[1]}"
+				done			
+	done
+}
+
+function LIST_DEPENDENCIES()
+{
+	ARRAYNAME="${1}"
+	array="${ARRAYNAME}[@]"
+	
+	echo "Package: $1"
+	
+	for element in "${!array}"; do
+		IFS=', ' read -a array <<< "${element}"
+		echo "	* ${array[0]} - ${array[1]} - ${array[2]} - ${array[3]}"		
+	done
+}
+
+
+function LIST_ALL_DEPENDENCIES()
+{
+	ARRAYNAME="${1}"
+	array="${ARRAYNAME}[@]"
+	
+	echo "Package: $1"
+	
+	for element in "${!array}"; do
+		IFS=', ' read -a array <<< "${element}"
+		echo "	* ${array[0]} - ${array[1]} - ${array[2]} - ${array[3]}"
+		ARRAYNAME=${array[0]}
+		array="${ARRAYNAME}[@]"			
+				for item in "${!array}"; do
+					IFS=', ' read -a array <<< "${item}"
+					echo "	 + ${array[0]} - ${array[1]}"
+				done			
+	done
+}
+
+function ADD_DEPENDENCIES()
+{
+	local _package_container=${1}	
+	local _packager=${2}	
+	local _package_name=${3}
+	local _version=${4}
+	local _package_name_clean=$(echo "${_package_name}" | sed 's#\.#\_#g' | sed 's#\-#\_#g')	
+	local _version_clean=$(echo "${_version}" | sed 's#\.#\_#g' | sed 's#\-#\_#g')	
+	local _new_var="${_package_name_clean}_${_version_clean}"
+	eval "${_package_container}+=(${_new_var},${_packager},${_package_name},${_version})"
+}
+
+function ADD_TOOLS()
+{
+	local _package_name=${1}
+	local _version=${2}	
+	local _system=${3}
+	local _file=${4}		
+	local _version_clean=$(echo "${_version}" | sed 's#\.#\_#g' | sed 's#\-#\_#g')
+	local _new_var="${_package_name}_${_version_clean}"
+	
+	local _check="${_new_var}"
+		
+	if [ "${!_check}" == "" ]
+	then
+		TOOLS_LIST+=(${_new_var},${_packager},${_package_name},${_version})
+	fi
+	
+	eval "${_new_var}+=(${_system},${_file})"
+}
+
+
+
 function add_new_release()
 {
 	echo -e "ADD_RELEASE_VERSION\t\t${1}\t${2}\t${3}\n" >> ${CONFIG_FILE}
@@ -168,7 +416,7 @@ function add_new_release()
 
 function ADD_RELEASE_VERSION()
 {
-RELEASE_VERSION+=("${1}","${2}","${3}")
+RELEASE_VERSION+=("${1}","${2}","${3}","${4}")
 }
 
 
@@ -363,6 +611,11 @@ while [ "$1" != "" ]; do
     shift
 done
 
-
+# echo "test"
 check_config_exists "./${DEFAULT_CONFIG_FILE}"
+
+# generate_tools_deps_template Digistump_SAM
+
+# echo $wew
+#generate_tools_template
 make_packages
