@@ -23,9 +23,13 @@ local _sha=${3}
 local _size=${4}
 local _template=${4}
 
+local _template_ext=".json"
+
 if [ "default" = "${_template}" ] || [ "" = "${_template}" ]
 then
-_template=${TEMPLATE_PLATFORM_FILE}
+_template="${TEMPLATE_PLATFORM_FILE}${_template_ext}"
+else
+_template+="${_template_ext}"
 fi
 
 local archiveFileName="${2}"; 
