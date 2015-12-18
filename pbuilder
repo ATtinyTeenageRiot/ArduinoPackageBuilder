@@ -95,9 +95,10 @@ function archive_release_repo() #repo dir, filename
 
 	local _REPO_DIR=${1}
 	local _ARCHIVE_FILE=${2}
-	
+	local _SOURCE_FILE=${3}
+
 	cd ${cwd}/${_REPO_DIR}
-	tar --exclude=".git" --exclude="make_package.sh" --exclude=".DS_Store" --exclude=".gitignore" --exclude=".gitmodules" --exclude="package_babygnusbuino2_index.json" -czf  ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  *
+	tar --exclude=".git" --exclude=".DS_Store" --exclude=".gitignore" --exclude=".gitmodules" -czf  ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  ${_SOURCE_FILE}
 	shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  | cut -d ' ' -f 1 > ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
 	cd "${cwd}"
 }
@@ -137,7 +138,7 @@ function make_packages()
 			echo "${_RELEASE_VERSION} exists, skip"
 		else
 			update_release_repo "${REPO_SOURCE_URL}" "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${_COMMIT_HASH}"
-			archive_release_repo "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}"
+			archive_release_repo "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}" "${BOARD_ARCH}"
 		fi	
 
 		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
