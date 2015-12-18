@@ -170,6 +170,8 @@ RELEASE_VERSION+=("${1}","${2}","${3}")
 function list_release()
 {
 	local tLen=${#RELEASE_VERSION[@]}
+	echo "------------------------------------------------------------------"			
+	echo "Releases:"
 
 	for (( i=0; i<${tLen}; i++ ));
 	do
@@ -177,13 +179,38 @@ function list_release()
 	local _RELEASE_VERSION=${array[0]}
 	local _COMMIT_HASH=${array[1]}
 
-	echo "release version: ${_RELEASE_VERSION} commit: ${_COMMIT_HASH}"
+	echo "- release version: ${_RELEASE_VERSION} commit: ${_COMMIT_HASH}"
 
 	done
+
+	echo "------------------------------------------------------------------"
 
 
 }
 
+
+function config_info()
+{
+cat<<EOF
+
+------------------------------------------------------------------			
+Package:
+
+- BOARD_PACKAGE_NAME=${BOARD_PACKAGE_NAME}
+- BOARD_PACKAGE_MAINTAINER=${BOARD_PACKAGE_MAINTAINER}
+- BOARD_PACKAGE_WEB_URL=${BOARD_PACKAGE_WEB_URL}
+- BOARD_PACKAGE_HELP_URL=${BOARD_PACKAGE_HELP_URL}
+- BOARD_PACKAGE_MAINTAINER_EMAIL=${BOARD_PACKAGE_MAINTAINER_EMAIL}
+
+- BOARD_NAME=${BOARD_NAME}
+- BOARD_ARCH=${BOARD_ARCH}
+- BOARD_CATEGORY=${BOARD_CATEGORY}
+- BOARD_HELP_URL=${BOARD_HELP_URL}
+
+------------------------------------------------------------------		
+
+EOF
+}
 
 function usage()
 {
@@ -198,6 +225,7 @@ function check_config_exists()
 	
 	if [ -e "${_FILE_NAME}" ]
 	then
+		echo "using config ${_FILE_NAME}"
 		CONFIG_FILE="${_FILE_NAME}"
 		source ${_FILE_NAME}
 	else
@@ -215,6 +243,12 @@ function check_config_exists()
 
 function git_init_release_pages()
 {
+	if [ -d "${RELEASES_DIR}/${RELEASE_REPO_DIR}" ] #if directory exists
+	then
+	echo "git init: directory ${RELEASES_DIR}/${RELEASE_REPO_DIR} already exist!"
+
+	else
+
 	cd ${RELEASES_DIR}
 	
 	git clone --depth 1 ${RELEASE_REPO_URL} ${RELEASE_REPO_DIR}
@@ -222,10 +256,15 @@ function git_init_release_pages()
 	git checkout --orphan ${RELEASE_REPO_BRANCH}
 
 	cd ${cwd}
+
+	fi
 }
 
 function git_push_release_pages()
 {
+	if [ -d "${RELEASES_DIR}/${RELEASE_REPO_DIR}" ] #if directory exists
+	then
+	
 	cd ${RELEASES_DIR}/${RELEASE_REPO_DIR}
 
 	git add .
@@ -233,6 +272,12 @@ function git_push_release_pages()
 	git push origin ${RELEASE_REPO_BRANCH}
 
 	cd ${cwd}
+
+	else
+
+	echo "git publish: directory ${RELEASES_DIR}/${RELEASE_REPO_DIR} is not exist!"
+	
+	fi
 }
 
 
@@ -249,10 +294,11 @@ while [ "$1" != "" ]; do
 			exit
 		;;
         -a | --add | add)
-			check_config_exists ${4}
-			echo "Releases:"
-			# echo ""
+			check_config_exists ${2}
+			config_info
 			list_release
+
+			echo ""			
 			echo "Add new release"
 			echo "Enter Version: "; read _version;
 			echo "Enter Commit#: "; read _commit;
