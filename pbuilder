@@ -8,8 +8,9 @@ DEFAULT_CONFIG_FILE="config.conf"
 RELEASES_DIR="releases"
 RELEASES_BOARD_DIR="boards"
 TEMPLATE_DIR="template"
-TEMPLATE_PLATFORM_FILE="platform.json"
-TEMPLATE_PACKAGE_FILE="package.json"
+TEMPLATE_PLATFORM_FILE="platform"
+TEMPLATE_PACKAGE_FILE="package"
+TEMPLATE_EXTENSION=".json"
 
 #REPO_LOCAL_DIR="staging/${REPO_SOURCE_LOCAL_DIR}"
 
@@ -23,7 +24,7 @@ local _sha=${3}
 local _size=${4}
 local _template=${4}
 
-local _template_ext=".json"
+local _template_ext="${TEMPLATE_EXTENSION}"
 
 if [ "default" = "${_template}" ] || [ "" = "${_template}" ]
 then
@@ -42,7 +43,7 @@ EOF
 function generate_package_template() #platforms
 {
 local _platforms=${1}
-local _template=${TEMPLATE_PACKAGE_FILE}
+local _template=${TEMPLATE_PACKAGE_FILE}${TEMPLATE_EXTENSION}
 eval "cat <<EOF
 $(<./${TEMPLATE_DIR}/${_template})
 EOF
