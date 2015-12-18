@@ -207,6 +207,11 @@ Package:
 - BOARD_CATEGORY=${BOARD_CATEGORY}
 - BOARD_HELP_URL=${BOARD_HELP_URL}
 
+Package url:
+Copy paste into arduino package url list
+
+- ${RELEASE_FILE_URL}/${RELEASE_INDEX_JSON_FILENAME}
+
 ------------------------------------------------------------------		
 
 EOF
@@ -324,6 +329,12 @@ while [ "$1" != "" ]; do
 			git_init_release_pages
 	        exit
         ;;  
+        info )
+			check_config_exists ${2} 
+			config_info
+			list_release
+	        exit
+        ;;            
         reset )
 			check_config_exists ${2} 
 			echo "hard reset local release repo"
