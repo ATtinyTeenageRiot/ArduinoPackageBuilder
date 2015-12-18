@@ -13,6 +13,8 @@ TEMPLATE_PACKAGE_FILE="package"
 TEMPLATE_EXTENSION=".json"
 TOOLS_LIST=()
 
+ARCHIVE_EXT=".tar.gz"
+
 #REPO_LOCAL_DIR="staging/${REPO_SOURCE_LOCAL_DIR}"
 
 #define the template.
@@ -106,8 +108,9 @@ function archive_release_repo() #repo dir, filename
 	local _SOURCE_FILE=${3}
 
 	cd ${cwd}/${_REPO_DIR}
-	tar --exclude=".git" --exclude=".DS_Store" --exclude=".gitignore" --exclude=".gitmodules" -czf  ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  ${_SOURCE_FILE}
-	shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz  | cut -d ' ' -f 1 > ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
+	tar --exclude=".git" --exclude=".DS_Store" --exclude=".gitignore" --exclude=".gitmodules" -czf  ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz ${_SOURCE_FILE}
+	git log -1 > ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
+	shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}${ARCHIVE_EXT}  | cut -d ' ' -f 1 >> ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
 	cd "${cwd}"
 }
 
@@ -116,7 +119,7 @@ function check_release_archive_exists()
 {
 	local _FILE_NAME=${1}
 	
-	if [ -e "${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_FILE_NAME}.tar.gz" ]
+	if [ -e "${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_FILE_NAME}${ARCHIVE_EXT}" ]
 	then
 		return 0 #true
 	else
@@ -275,22 +278,30 @@ function make_packages()
 		local _PLATFORM_TEMPLATE=${array[2]}
 		local _PLATFORM_DEPS=${array[3]}
 		
+		local tools_deps=`generate_tools_deps_template ${_PLATFORM_DEPS}`
+
 		#check for duplicate commit that already have archive
 		if check_commit_exist ${_COMMIT_HASH} ${_RELEASE_VERSION}
 		 then 
-		 	echo "if found duplicate"
+		 	#echo "if found duplicate"
 		 	#check our own release if exist
 			if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
 			then
-				echo "skip archiving, write to package json only"
+				#echo "skip archiving, write to package json only"
 				echo "${_RELEASE_VERSION} already exist, skip"
 			else #if we dont have package
-				echo "get that duplicate commit that have package archive"
-				_RELEASE_VERSION=`get_duplicate_archive ${_COMMIT_HASH} ${_RELEASE_VERSION}`
+				
+				local _duplicate_archive=`get_duplicate_archive ${_COMMIT_HASH} ${_RELEASE_VERSION}`
+
+				echo "${_RELEASE_VERSION} use archive from ${_duplicate_archive}"
+
+				local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_duplicate_archive}${ARCHIVE_EXT} | cut -d ' ' -f 1`
+				platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_duplicate_archive}${ARCHIVE_EXT} ${sha_result} "${tools_deps}" ${_PLATFORM_TEMPLATE}`
+
 			fi	
 
 		 else #if no duplicate commit
-		 	echo "no dup commit"
+		 	#echo "no dup commit"
 			 if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
 			 then
 			 	echo "${_RELEASE_VERSION} exists, skip"
@@ -298,20 +309,13 @@ function make_packages()
 			 	update_release_repo "${REPO_SOURCE_URL}" "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${_COMMIT_HASH}"
 			 	archive_release_repo "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}" "${BOARD_ARCH}"
 			 fi	
+
+			local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}${ARCHIVE_EXT} | cut -d ' ' -f 1`
+			platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}${ARCHIVE_EXT} ${sha_result} "${tools_deps}" ${_PLATFORM_TEMPLATE}`
+
 		fi
 		
-		# if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
-		# then
-		# 	echo "${_RELEASE_VERSION} exists, skip"
-		# else
-		# 	update_release_repo "${REPO_SOURCE_URL}" "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${_COMMIT_HASH}"
-		# 	archive_release_repo "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}" "${BOARD_ARCH}"
-		# fi	
 
-		local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz | cut -d ' ' -f 1`
-		local tools_deps=`generate_tools_deps_template ${_PLATFORM_DEPS}`
-
-		platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}.tar.gz ${sha_result} "${tools_deps}" ${_PLATFORM_TEMPLATE}`
 		
 		if [ $((i+1)) -ne $tLen ]
 		then
