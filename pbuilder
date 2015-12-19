@@ -23,18 +23,18 @@ TEMPLATE_EXTENSION=".json"
 
 function default_boards_template()
 {
-	local _template=`cat<<EOF
+	local _board_template=`cat<<EOF
 					
 					{
 						"name" : "${!_board}"
 					}
 EOF`
-echo "${_template}"
+echo "${_board_template}"
 }
 
 function default_platform_template()
 {
-	local _template=`cat<<EOF
+	local _plat_template=`cat<<EOF
 			{
 				"name" : "${BOARD_NAME}",
 				"architecture" : "${BOARD_ARCH}",
@@ -55,12 +55,12 @@ function default_platform_template()
 				]
 			}
 EOF`
-echo "${_template}"
+echo "${_plat_template}"
 }
 
 function default_package_template()
 {
-	local _template=`cat<<EOF
+	local _pkg_template=`cat<<EOF
 {
 	"packages" : [
 		{
@@ -79,7 +79,7 @@ function default_package_template()
 	]
 }
 EOF`
-echo "${_template}"
+echo "${_pkg_template}"
 }
 
 # -------------------------------------------------------------------------------------------
@@ -343,8 +343,6 @@ function get_duplicate_archive()
   		IFS=', ' read -a array <<< "${RELEASE_VERSION[$j]}"
 		local _RELEASE_VERSION=${array[0]}
 		local _COMMIT_HASH=${array[1]}
-		local _PLATFORM_TEMPLATE=${array[2]}
-		local _PLATFORM_DEPS=${array[3]}
 
 		if [ "${_hash}" == "${_COMMIT_HASH}" ] && [ "${_my_version}" != "${_RELEASE_VERSION}" ] 
 		then
@@ -377,8 +375,6 @@ function check_commit_exist()
   		IFS=', ' read -a array <<< "${RELEASE_VERSION[$j]}"
 		local _RELEASE_VERSION=${array[0]}
 		local _COMMIT_HASH=${array[1]}
-		local _PLATFORM_TEMPLATE=${array[2]}
-		local _PLATFORM_DEPS=${array[3]}
 
 		if [ "${_hash}" == "${_COMMIT_HASH}" ] && [ "${_my_version}" != "${_RELEASE_VERSION}" ] 
 		then
@@ -580,8 +576,8 @@ function make_packages()
   		IFS=', ' read -a array <<< "${RELEASE_VERSION[$i]}"
 		local _RELEASE_VERSION=${array[0]}
 		local _COMMIT_HASH=${array[1]}
-		local _PLATFORM_TEMPLATE=${array[2]}
-		local _PLATFORM_DEPS=${array[3]}
+		local _PLATFORM_DEPS=${array[2]}
+		local _PLATFORM_TEMPLATE=${array[3]}
 		
 		local tools_deps=`generate_tools_deps_template ${_PLATFORM_DEPS}`
 
