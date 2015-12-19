@@ -2,129 +2,157 @@
 
 cwd=$(pwd)
 RELEASE_VERSION=()
+TOOLS_LIST=()
+
+DEFAULT_CONFIG_FILE="config.conf"
 
 STAGING_DIR="staging"
-DEFAULT_CONFIG_FILE="config.conf"
 RELEASES_DIR="releases"
 RELEASES_BOARD_DIR="boards"
+ARCHIVE_EXT=".tar.gz"
+
 TEMPLATE_DIR="template"
 TEMPLATE_PLATFORM_FILE="platform"
 TEMPLATE_PACKAGE_FILE="package"
 TEMPLATE_EXTENSION=".json"
-TOOLS_LIST=()
 
-ARCHIVE_EXT=".tar.gz"
 
-#REPO_LOCAL_DIR="staging/${REPO_SOURCE_LOCAL_DIR}"
+# -------------------------------------------------------------------------------------------
+#	Template stuff
+# -------------------------------------------------------------------------------------------
+
+function default_boards_template()
+{
+	local _template=`cat<<EOF
+					
+					{
+						"name" : "${!_board}"
+					}
+EOF`
+echo "${_template}"
+}
+
+function default_platform_template()
+{
+	local _template=`cat<<EOF
+			{
+				"name" : "${BOARD_NAME}",
+				"architecture" : "${BOARD_ARCH}",
+				"version" : "${_version}",
+				"category" : "${BOARD_CATEGORY}",
+				"url" : "${_url}",
+				"archiveFileName" : "${archiveFileName##*/}",
+				"checksum" : "SHA-256:${_sha}",
+				"size" : "${_size}",
+				"help" : {
+					"online" : "${BOARD_HELP_URL}"
+				},
+				"boards" : [
+					${_boards}
+				],
+				"toolsDependencies" : [
+					${_tools_deps}
+				]
+			}
+EOF`
+echo "${_template}"
+}
+
+function default_package_template()
+{
+	local _template=`cat<<EOF
+{
+	"packages" : [
+		{
+			"name" : "${BOARD_PACKAGE_NAME}",
+			"maintainer" : "${BOARD_PACKAGE_MAINTAINER}",
+			"websiteURL" : "${BOARD_PACKAGE_WEB_URL}",
+			"email" : "${BOARD_PACKAGE_MAINTAINER_EMAIL}",
+			"help" : {
+				"online" : "${BOARD_PACKAGE_HELP_URL}"
+			},
+			"platforms" : [
+				${_platforms}
+			],
+			"tools" : []
+		}
+	]
+}
+EOF`
+echo "${_template}"
+}
+
+# -------------------------------------------------------------------------------------------
+#	Template stuff
+# -------------------------------------------------------------------------------------------
 
 #define the template.
 function generate_platform_template() #version, url, checksum, size
 {
 
-local _version=${1}
-local _url=${2}
-local _sha=${3}
-# local _size=${4}
+	local _version=${1}
+	local _url=${2}
+	local archiveFileName="${2}"; 
+	local _sha=${3}
+	# local _size=${4}
+	local _tools_deps=${4}
+	local _template=${5}
 
-local _tools_deps=${4}
-local _template=${5}
+	local _boards=`generate_boards_template BOARD_LIST`
 
-local _template_ext="${TEMPLATE_EXTENSION}"
 
-if [ "default" = "${_template}" ] || [ "" = "${_template}" ]
-then
-_template="${TEMPLATE_PLATFORM_FILE}${_template_ext}"
-else
-_template+="${_template_ext}"
-fi
+	if [ "${_template}" != "" ] && [ "${_template}" != "default" ]
+	then
+		eval "cat <<EOF
+		$(<./${TEMPLATE_DIR}/${_template}${TEMPLATE_EXTENSION})
+		EOF
+		" 2> /dev/null
+	else
+		default_platform_template
+	fi
 
-local archiveFileName="${2}"; 
-eval "cat <<EOF
-$(<./${TEMPLATE_DIR}/${_template})
-EOF
-" 2> /dev/null
+
 }
 
 function generate_package_template() #platforms
 {
-local _platforms=${1}
-local _template=${TEMPLATE_PACKAGE_FILE}${TEMPLATE_EXTENSION}
-eval "cat <<EOF
-$(<./${TEMPLATE_DIR}/${_template})
-EOF
-" 2> /dev/null
-}
+	local _platforms=${1}
+	local _template=${2}
 
-function git_update_repo()
-{
-	if [ -d "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" ] #if directory exists
+	if [ "${_template}" != "" ] && [ "${_template}" != "default" ]
 	then
-		cd "${cwd}/${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}"
-
-		git fetch --all
-		git pull --all
-
-#		for b in `git branch -r | grep -v -- '->'`; 
-#		do 
-#			echo "${b}"
-#			#git branch --track ${b##origin/} $b; 
-#		done
-
-	fi
-	
-	cd "${cwd}"
-}
-
-function update_release_repo() #repo url, dir, specific commit
-{
-	local _REPO_REMOTE_URL=${1}
-	local _REPO_LOCAL_DIR=${2}
-	local _COMMIT_HASH=${3}
-	
-	if [ -d "${_REPO_LOCAL_DIR}" ] #if directory exists
-	then
-		cd "${cwd}/${_REPO_LOCAL_DIR}"
-		git reset --hard ${_COMMIT_HASH}
-		git submodule update --init --recursive
-		git submodule foreach --recursive git clean -d -f -f
+		eval "cat <<EOF
+		$(<./${TEMPLATE_DIR}/${_template}${TEMPLATE_EXTENSION})
+		EOF
+		" 2> /dev/null
 	else
-		git clone "${_REPO_REMOTE_URL}" "${_REPO_LOCAL_DIR}"
-		cd "${_REPO_LOCAL_DIR}"
-		git checkout ${_COMMIT_HASH}
-		git submodule update --init --recursive
-		git submodule foreach --recursive git clean -d -f -f
+		default_package_template
 	fi
-	
-	cd "${cwd}"
+
 }
 
 
-function archive_release_repo() #repo dir, filename
+function generate_boards_template()
 {
-	mkdir -p ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}
+	local _tmp_string=""
+	local i=0
 
-	local _REPO_DIR=${1}
-	local _ARCHIVE_FILE=${2}
-	local _SOURCE_FILE=${3}
+	local array="${1}[@]"
+	local EXPR="echo \${#$1[@]}" 
+	local _cnt=`eval $EXPR`
 
-	cd ${cwd}/${_REPO_DIR}
-	tar --exclude=".git" --exclude=".DS_Store" --exclude=".gitignore" --exclude=".gitmodules" -czf  ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz ${_SOURCE_FILE}
-	git log -1 > ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
-	shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}${ARCHIVE_EXT}  | cut -d ' ' -f 1 >> ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
-	cd "${cwd}"
-}
+	for (( i=0; i<${_cnt}; i++ ));
+	do
+		local _board="$1[$i]"
+		_tmp_string+=`default_boards_template`
+		if [ $((i+1)) -ne ${_cnt} ]
+		then
+			_tmp_string+=","
+		fi
 
+	done
+	echo "${_tmp_string}"
 
-function check_release_archive_exists()
-{
-	local _FILE_NAME=${1}
-	
-	if [ -e "${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_FILE_NAME}${ARCHIVE_EXT}" ]
-	then
-		return 0 #true
-	else
-		return 1 #false
-	fi
 }
 
 
@@ -178,60 +206,130 @@ function generate_tools_template()
 
 			for (( j=0; j<${_cnt_}; j++ ));
 			do
-
-
 				echo $j
-
-
 
 				if [ $((j+1)) -ne ${_cnt_} ]
 				then
 					echo ","
 				fi
 
-
 			done
-
 
 		if [ $((i+1)) -ne ${_cnt} ]
 		then
 			echo "-,"
 		fi
 
-
 	done
 	echo "${_tmp_string}"
 }
 
-function check_commit_exist()
+# -------------------------------------------------------------------------------------------
+#	git
+# -------------------------------------------------------------------------------------------
+
+function git_update_repo()
 {
-	local _hash=${1}
-	local _my_version=${2}
-	local j=0
+	if [ -d "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" ] #if directory exists
+	then
+		cd "${cwd}/${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}"
 
-	local tLen=${#RELEASE_VERSION[@]}
-	for ((j=0; j<${tLen}; j++ ));
-	do
-  		IFS=', ' read -a array <<< "${RELEASE_VERSION[$j]}"
-		local _RELEASE_VERSION=${array[0]}
-		local _COMMIT_HASH=${array[1]}
-		local _PLATFORM_TEMPLATE=${array[2]}
-		local _PLATFORM_DEPS=${array[3]}
+		git fetch --all
+		git pull --all
 
-		if [ "${_hash}" == "${_COMMIT_HASH}" ] && [ "${_my_version}" != "${_RELEASE_VERSION}" ] 
-		then
-			if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
-			then
-				return 0
-			fi
-		fi
+#		for b in `git branch -r | grep -v -- '->'`; 
+#		do 
+#			echo "${b}"
+#			#git branch --track ${b##origin/} $b; 
+#		done
 
-	done
+	fi
+	
+	cd "${cwd}"
+}
 
-	return 1
+function update_release_repo() #repo url, dir, specific commit
+{
+	local _REPO_REMOTE_URL=${1}
+	local _REPO_LOCAL_DIR=${2}
+	local _COMMIT_HASH=${3}
+	
+	if [ -d "${_REPO_LOCAL_DIR}" ] #if directory exists
+	then
+		cd "${cwd}/${_REPO_LOCAL_DIR}"
+		git reset --hard ${_COMMIT_HASH}
+		git submodule update --init --recursive
+		git submodule foreach --recursive git clean -d -f -f
+	else
+		git clone "${_REPO_REMOTE_URL}" "${_REPO_LOCAL_DIR}"
+		cd "${_REPO_LOCAL_DIR}"
+		git checkout ${_COMMIT_HASH}
+		git submodule update --init --recursive
+		git submodule foreach --recursive git clean -d -f -f
+	fi
+	
+	cd "${cwd}"
 }
 
 
+
+function git_init_release_pages()
+{
+	if [ -d "${RELEASES_DIR}/${RELEASE_REPO_DIR}" ] #if directory exists
+	then
+	echo "git init: directory ${RELEASES_DIR}/${RELEASE_REPO_DIR} already exist!"
+
+	else
+
+	cd ${RELEASES_DIR}
+	
+	git clone --depth 1 ${RELEASE_REPO_URL} ${RELEASE_REPO_DIR}
+	cd ${RELEASE_REPO_DIR}
+	git checkout --orphan ${RELEASE_REPO_BRANCH}
+
+	cd ${cwd}
+
+	fi
+}
+
+function git_push_release_pages()
+{
+	if [ -d "${RELEASES_DIR}/${RELEASE_REPO_DIR}" ] #if directory exists
+	then
+	
+	cd ${RELEASES_DIR}/${RELEASE_REPO_DIR}
+
+	git add .
+	git commit -m "update release"
+	git push origin ${RELEASE_REPO_BRANCH}
+
+	cd ${cwd}
+
+	else
+
+	echo "git publish: directory ${RELEASES_DIR}/${RELEASE_REPO_DIR} is not exist!"
+	
+	fi
+}
+
+# -------------------------------------------------------------------------------------------
+#	archiving
+# -------------------------------------------------------------------------------------------
+
+function archive_release_repo() #repo dir, filename
+{
+	mkdir -p ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}
+
+	local _REPO_DIR=${1}
+	local _ARCHIVE_FILE=${2}
+	local _SOURCE_FILE=${3}
+
+	cd ${cwd}/${_REPO_DIR}
+	tar --exclude=".git" --exclude=".DS_Store" --exclude=".gitignore" --exclude=".gitmodules" -czf  ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.tar.gz ${_SOURCE_FILE}
+	git log -1 > ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
+	shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}${ARCHIVE_EXT}  | cut -d ' ' -f 1 >> ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_ARCHIVE_FILE}.sha.txt
+	cd "${cwd}"
+}
 
 function get_duplicate_archive()
 {
@@ -262,71 +360,81 @@ function get_duplicate_archive()
 }
 
 
-function make_packages()
-{
-	#git_update_repo
+# -------------------------------------------------------------------------------------------
+#	check function
+# -------------------------------------------------------------------------------------------
 
-	# get length of an array
+
+function check_commit_exist()
+{
+	local _hash=${1}
+	local _my_version=${2}
+	local j=0
+
 	local tLen=${#RELEASE_VERSION[@]}
-	 
-	# use for loop read all
-	for (( i=0; i<${tLen}; i++ ));
+	for ((j=0; j<${tLen}; j++ ));
 	do
-  		IFS=', ' read -a array <<< "${RELEASE_VERSION[$i]}"
+  		IFS=', ' read -a array <<< "${RELEASE_VERSION[$j]}"
 		local _RELEASE_VERSION=${array[0]}
 		local _COMMIT_HASH=${array[1]}
 		local _PLATFORM_TEMPLATE=${array[2]}
 		local _PLATFORM_DEPS=${array[3]}
-		
-		local tools_deps=`generate_tools_deps_template ${_PLATFORM_DEPS}`
 
-		#check for duplicate commit that already have archive
-		if check_commit_exist ${_COMMIT_HASH} ${_RELEASE_VERSION}
-		 then 
-		 	#echo "if found duplicate"
-		 	#check our own release if exist
+		if [ "${_hash}" == "${_COMMIT_HASH}" ] && [ "${_my_version}" != "${_RELEASE_VERSION}" ] 
+		then
 			if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
 			then
-				#echo "skip archiving, write to package json only"
-				echo "${_RELEASE_VERSION} already exist, skip"
-			else #if we dont have package
-				
-				local _duplicate_archive=`get_duplicate_archive ${_COMMIT_HASH} ${_RELEASE_VERSION}`
-
-				echo "${_RELEASE_VERSION} use archive from ${_duplicate_archive}"
-
-				local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_duplicate_archive}${ARCHIVE_EXT} | cut -d ' ' -f 1`
-				platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_duplicate_archive}${ARCHIVE_EXT} ${sha_result} "${tools_deps}" ${_PLATFORM_TEMPLATE}`
-
-			fi	
-
-		 else #if no duplicate commit
-		 	#echo "no dup commit"
-			 if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
-			 then
-			 	echo "${_RELEASE_VERSION} exists, skip"
-			 else
-			 	update_release_repo "${REPO_SOURCE_URL}" "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${_COMMIT_HASH}"
-			 	archive_release_repo "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}" "${BOARD_ARCH}"
-			 fi	
-
-			local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}${ARCHIVE_EXT} | cut -d ' ' -f 1`
-			platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}${ARCHIVE_EXT} ${sha_result} "${tools_deps}" ${_PLATFORM_TEMPLATE}`
-
+				return 0
+			fi
 		fi
-		
 
-		
-		if [ $((i+1)) -ne $tLen ]
-		then
-			platform_list+=","
-		fi
 	done
 
-	local json_package_output=`generate_package_template "${platform_list}"`
-	echo "${json_package_output}" > "${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}"
+	return 1
 }
 
+function check_release_archive_exists()
+{
+	local _FILE_NAME=${1}
+	
+	if [ -e "${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${_FILE_NAME}${ARCHIVE_EXT}" ]
+	then
+		return 0 #true
+	else
+		return 1 #false
+	fi
+}
+
+
+
+
+function check_config_exists()
+{
+	local _FILE_NAME=${1}
+	
+	if [ -e "${_FILE_NAME}" ]
+	then
+		echo "using config ${_FILE_NAME}"
+		CONFIG_FILE="${_FILE_NAME}"
+		source ${_FILE_NAME}
+	else
+		if [ -e "${DEFAULT_CONFIG_FILE}" ]
+		then
+			echo "using default ./${DEFAULT_CONFIG_FILE}"
+			CONFIG_FILE="./${DEFAULT_CONFIG_FILE}"
+			source "${CONFIG_FILE}"
+		else
+			echo "config not found, abort"
+			exit 1
+		fi
+	fi
+}
+
+
+
+# -------------------------------------------------------------------------------------------
+#	tools and deps management
+# -------------------------------------------------------------------------------------------
 
 
 function LIST_ALL_TOOLS()
@@ -410,17 +518,25 @@ function ADD_TOOLS()
 	eval "${_new_var}+=(${_system},${_file})"
 }
 
+function ADD_BOARD_LIST()
+{
+	BOARD_LIST+=("${1}")
+}
+
+# -------------------------------------------------------------------------------------------
+#	release 
+# -------------------------------------------------------------------------------------------
 
 
 function add_new_release()
 {
-	echo -e "ADD_RELEASE_VERSION\t\t${1}\t${2}\t${3}\n" >> ${CONFIG_FILE}
+	echo -e "ADD_RELEASE\t\t${1}\t${2}\t${3}\n" >> ${CONFIG_FILE}
 }
 
 
-function ADD_RELEASE_VERSION()
+function ADD_RELEASE()
 {
-RELEASE_VERSION+=("${1}","${2}","${3}","${4}")
+	RELEASE_VERSION+=("${1}","${2}","${3}","${4}")
 }
 
 
@@ -444,6 +560,84 @@ function list_release()
 
 
 }
+
+
+# -------------------------------------------------------------------------------------------
+#	package builder
+# -------------------------------------------------------------------------------------------
+
+
+function make_packages()
+{
+	#git_update_repo
+
+	# get length of an array
+	local tLen=${#RELEASE_VERSION[@]}
+	 
+	# use for loop read all
+	for (( i=0; i<${tLen}; i++ ));
+	do
+  		IFS=', ' read -a array <<< "${RELEASE_VERSION[$i]}"
+		local _RELEASE_VERSION=${array[0]}
+		local _COMMIT_HASH=${array[1]}
+		local _PLATFORM_TEMPLATE=${array[2]}
+		local _PLATFORM_DEPS=${array[3]}
+		
+		local tools_deps=`generate_tools_deps_template ${_PLATFORM_DEPS}`
+
+		#check for duplicate commit that already have archive
+		if check_commit_exist ${_COMMIT_HASH} ${_RELEASE_VERSION}
+		 then 
+		 	#echo "if found duplicate"
+		 	#check our own release if exist
+			if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
+			then
+				#echo "skip archiving, write to package json only"
+				echo "${_RELEASE_VERSION} already exist, skip"
+			else #if we dont have package
+				
+				local _duplicate_archive=`get_duplicate_archive ${_COMMIT_HASH} ${_RELEASE_VERSION}`
+
+				echo "${_RELEASE_VERSION} use archive from ${_duplicate_archive}"
+
+				local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_duplicate_archive}${ARCHIVE_EXT} | cut -d ' ' -f 1`
+				platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_duplicate_archive}${ARCHIVE_EXT} ${sha_result} "${tools_deps}" ${_PLATFORM_TEMPLATE}`
+
+			fi	
+
+		 else #if no duplicate commit
+		 	#echo "no dup commit"
+			 if check_release_archive_exists ${RELEASE_PREFIX}${_RELEASE_VERSION}
+			 then
+			 	echo "${_RELEASE_VERSION} exists, skip"
+			 else
+			 	update_release_repo "${REPO_SOURCE_URL}" "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${_COMMIT_HASH}"
+			 	archive_release_repo "${STAGING_DIR}/${REPO_SOURCE_LOCAL_DIR}" "${RELEASE_PREFIX}${_RELEASE_VERSION}" "${BOARD_ARCH}"
+			 fi	
+
+			local sha_result=`shasum -a 256 ${cwd}/${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}${ARCHIVE_EXT} | cut -d ' ' -f 1`
+			platform_list+=`generate_platform_template ${_RELEASE_VERSION} ${RELEASE_FILE_URL}/${RELEASES_BOARD_DIR}/${RELEASE_PREFIX}${_RELEASE_VERSION}${ARCHIVE_EXT} ${sha_result} "${tools_deps}" ${_PLATFORM_TEMPLATE}`
+
+		fi
+		
+
+		
+		if [ $((i+1)) -ne $tLen ]
+		then
+			platform_list+=","
+		fi
+	done
+
+	local json_package_output=`generate_package_template "${platform_list}"`
+	echo "${json_package_output}" > "${RELEASES_DIR}/${RELEASE_REPO_DIR}/${RELEASE_INDEX_JSON_FILENAME}"
+}
+
+
+
+
+# -------------------------------------------------------------------------------------------
+#	help
+# -------------------------------------------------------------------------------------------
 
 
 function config_info()
@@ -480,67 +674,9 @@ echo "usage"
 }
 
 
-
-function check_config_exists()
-{
-	local _FILE_NAME=${1}
-	
-	if [ -e "${_FILE_NAME}" ]
-	then
-		echo "using config ${_FILE_NAME}"
-		CONFIG_FILE="${_FILE_NAME}"
-		source ${_FILE_NAME}
-	else
-		if [ -e "${DEFAULT_CONFIG_FILE}" ]
-		then
-			echo "using default ./${DEFAULT_CONFIG_FILE}"
-			CONFIG_FILE="./${DEFAULT_CONFIG_FILE}"
-			source "${CONFIG_FILE}"
-		else
-			echo "config not found, abort"
-			exit 1
-		fi
-	fi
-}
-
-function git_init_release_pages()
-{
-	if [ -d "${RELEASES_DIR}/${RELEASE_REPO_DIR}" ] #if directory exists
-	then
-	echo "git init: directory ${RELEASES_DIR}/${RELEASE_REPO_DIR} already exist!"
-
-	else
-
-	cd ${RELEASES_DIR}
-	
-	git clone --depth 1 ${RELEASE_REPO_URL} ${RELEASE_REPO_DIR}
-	cd ${RELEASE_REPO_DIR}
-	git checkout --orphan ${RELEASE_REPO_BRANCH}
-
-	cd ${cwd}
-
-	fi
-}
-
-function git_push_release_pages()
-{
-	if [ -d "${RELEASES_DIR}/${RELEASE_REPO_DIR}" ] #if directory exists
-	then
-	
-	cd ${RELEASES_DIR}/${RELEASE_REPO_DIR}
-
-	git add .
-	git commit -m "update release"
-	git push origin ${RELEASE_REPO_BRANCH}
-
-	cd ${cwd}
-
-	else
-
-	echo "git publish: directory ${RELEASES_DIR}/${RELEASE_REPO_DIR} is not exist!"
-	
-	fi
-}
+# -------------------------------------------------------------------------------------------
+#	argument
+# -------------------------------------------------------------------------------------------
 
 
 while [ "$1" != "" ]; do
@@ -615,6 +751,11 @@ while [ "$1" != "" ]; do
     shift
 done
 
+
+# -------------------------------------------------------------------------------------------
+#	if no argument specified
+# -------------------------------------------------------------------------------------------
+
 # echo "test"
 check_config_exists "./${DEFAULT_CONFIG_FILE}"
 
@@ -623,3 +764,5 @@ check_config_exists "./${DEFAULT_CONFIG_FILE}"
 # echo $wew
 #generate_tools_template
 make_packages
+
+#generate_boards_template BOARD_LIST
