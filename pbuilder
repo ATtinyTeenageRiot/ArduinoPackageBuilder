@@ -569,7 +569,7 @@ function list_release()
 
 function make_packages()
 {
-	#git_update_repo
+	git_update_repo
 
 	# get length of an array
 	local tLen=${#RELEASE_VERSION[@]}
@@ -675,6 +675,22 @@ echo "usage"
 
 
 # -------------------------------------------------------------------------------------------
+#	todo
+# -------------------------------------------------------------------------------------------
+
+function git_reset_staging()
+{
+		if [ -d "${_REPO_LOCAL_DIR}" ] #if directory exists
+		then
+			cd ${RELEASES_DIR}/${RELEASE_REPO_DIR}
+			git reset --hard
+			git clean -dfx
+		else
+			echo "directory not exist"
+		fi
+}
+
+# -------------------------------------------------------------------------------------------
 #	argument
 # -------------------------------------------------------------------------------------------
 
@@ -731,8 +747,7 @@ while [ "$1" != "" ]; do
         reset )
 			check_config_exists ${2} 
 			echo "hard reset local release repo"
-			cd ${RELEASES_DIR}/${RELEASE_REPO_DIR}
-			git reset --hard
+			git_reset_staging
 	        exit
         ;;            
         clean )
