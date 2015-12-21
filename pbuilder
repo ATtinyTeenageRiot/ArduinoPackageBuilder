@@ -577,9 +577,12 @@ function make_packages()
 		local _RELEASE_VERSION=${array[0]}
 		local _COMMIT_HASH=${array[1]}
 		local _PLATFORM_DEPS=${array[2]}
-		local _PLATFORM_TEMPLATE=${array[3]}
-		
-		local tools_deps=`generate_tools_deps_template ${_PLATFORM_DEPS}`
+		local _PLATFORM_TEMPLATE=${array[3]}	
+
+		if [ "${_PLATFORM_DEPS}" != "" ]
+		then
+			local tools_deps=`generate_tools_deps_template ${_PLATFORM_DEPS}`
+		fi
 
 		#check for duplicate commit that already have archive
 		if check_commit_exist ${_COMMIT_HASH} ${_RELEASE_VERSION}
